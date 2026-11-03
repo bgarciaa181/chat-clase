@@ -4,3 +4,6 @@ __pycache__/
 
 # Configuración de VS Code
 .vscode/
+
+# Archivos recibidos por el chat (son de cada uno, no del proyecto)
+recibidos/
