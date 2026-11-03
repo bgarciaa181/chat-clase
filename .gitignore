@@ -8,3 +8,6 @@ __pycache__/
 # Archivos que se suben o reciben por el chat (no son parte del proyecto)
 archivos/
 recibidos/
+
+# Historial y registro del chat (tienen las conversaciones, son privados)
+datos/

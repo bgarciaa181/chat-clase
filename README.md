@@ -70,6 +70,44 @@ Navegador                                   Servidor
 - La barra de progreso está hecha de **cuadritos**, y cada uno representa un grupo de trozos.
 - Los demás descargan el archivo con `GET /descargar/<id>`, y el servidor lo envía de 64 KB en 64 KB.
 
+### Historial y registro (log)
+
+Todo se guarda en la carpeta `datos/`:
+
+- **`historial.json`**: los mensajes y la lista de archivos. Se guarda con cada mensaje y se carga al arrancar, así que **no se pierde nada al apagar el servidor**. Se escribe primero en un archivo temporal y luego se renombra, para que no se quede a medias si se corta.
+- **`registro-AAAA-MM-DD.log`**: el log del servidor, un archivo por día, con la fecha, la IP y qué ha pasado:
+
+```
+[2026-11-03 12:38:10] 192.168.1.23    ENTRA    Maxi
+[2026-11-03 12:38:15] 192.168.1.23    MENSAJE  Maxi: Que tal?
+[2026-11-03 12:39:02] 192.168.1.31    ARCHIVO  Luis sube apuntes.pdf (3.0 MB)
+[2026-11-03 12:39:40] 192.168.1.50    DESCARGA apuntes.pdf
+```
+
+Para verlo en directo mientras se usa el chat:
+
+```bash
+tail -f datos/registro-$(date +%F).log
+```
+
+Para buscar algo concreto en todos los días, por ejemplo todo lo que ha hecho una IP:
+
+```bash
+grep "192.168.1.23" datos/registro-*.log
+```
+
+### Limpieza automática
+
+Para que el disco no se llene, al principio de `servidor_web.py` hay un ajuste:
+
+```python
+DIAS_GUARDAR = 7   # 0 = guardar siempre
+```
+
+Una vez por hora, un hilo borra los mensajes, **los archivos subidos** y los logs de más de esos días (la misma idea que `logrotate` en Linux). También borra los restos de subidas que se cortaron a medias.
+
+La carpeta `datos/` está en el `.gitignore`: **nunca se sube a GitHub**. Cada persona que descargue el proyecto tiene su propio historial y su propio log, solo en su equipo.
+
 ### Seguridad básica
 
 - Los mensajes se muestran con `textContent`, así que nadie puede colar código HTML o JavaScript.
@@ -93,11 +131,11 @@ Navegador                                   Servidor
 
 ## ⚠️ Aviso
 
-Proyecto educativo para usar entre compañeros de confianza. Sin Tailscale, los mensajes viajan sin cifrar por la red local. Los mensajes se borran al apagar el servidor; los archivos subidos se quedan en la carpeta `archivos/`.
+Proyecto educativo para usar entre compañeros de confianza. Sin Tailscale, los mensajes viajan sin cifrar por la red local. El servidor guarda las conversaciones y las IPs en `datos/`, así que avisa a tus compañeros de que el chat queda registrado. Para empezar de cero, borra las carpetas `datos/` y `archivos/` con el servidor apagado.
 
 ## 🔮 Posibles mejoras
 
-- [ ] Guardar el historial de mensajes en un archivo
+- [x] Guardar el historial y un registro (log) de lo que pasa
 - [ ] Mensajes privados
 - [ ] Contraseña para entrar al chat
 - [ ] Usar WebSockets en vez de polling
