@@ -1,137 +1,106 @@
 # 💬 Chat de clase
 
-Chat hecho en **Python** con **sockets** y **hilos** para hablar y **pasarse archivos** con los compañeros. Un equipo hace de servidor y el resto se conectan como clientes, desde la misma red local o desde casa usando **Tailscale**.
+Chat para hablar y **pasarse archivos de cualquier tamaño** con los compañeros de clase, desde el **navegador** del PC o del móvil. El servidor está hecho en **Python** sin librerías externas y la página en **HTML, CSS y JavaScript**.
 
-Proyecto personal para practicar redes (modelo cliente-servidor, TCP, IPs, puertos y VPN) mientras estudio el Grado Superior de ASIR.
+Proyecto personal para practicar redes y desarrollo web mientras estudio el Grado Superior de ASIR.
 
 ## ✨ Qué se puede hacer
 
-- 💬 Mandar mensajes a todos los conectados
-- 📎 Enviar archivos (fotos, PDFs, apuntes... hasta 5 MB)
-- 📂 Los archivos recibidos se guardan solos en la carpeta `recibidos/`
+- 💬 Hablar con todos los conectados, desde el PC o el móvil
+- 📎 Enviar archivos de hasta **2 GB**, que se suben **por trozos** con barra de progreso
+- 🖼️ Las fotos se ven directamente en el chat
+- 🖱️ Arrastrar archivos encima del chat para enviarlos
 - 👥 Ver quién está conectado
-- 🪟 Cliente con ventana o cliente de terminal (pueden usarse a la vez)
+- 🌙 Modo oscuro automático
 
 ## 📁 Archivos
 
-| Archivo          | Qué es                                                     |
-|------------------|------------------------------------------------------------|
-| `servidor.py`    | Recibe los mensajes y archivos y los reenvía a los demás   |
-| `cliente_gui.py` | Cliente con ventana (Tkinter)                              |
-| `cliente.py`     | Cliente de terminal                                        |
+| Archivo / carpeta  | Qué es                                                         |
+|--------------------|----------------------------------------------------------------|
+| `servidor_web.py`  | Servidor web y API del chat (mensajes y subida de archivos)    |
+| `web/index.html`   | La página del chat que se abre en el navegador                 |
+
+## 🚀 Cómo usarlo
+
+**1. Arrancar el servidor** en un equipo:
+
+```bash
+python3 servidor_web.py
+```
+
+```
+===== CHAT DE CLASE (v3 web) =====
+Abre en el navegador:  http://localhost:8080
+Tus compañeros:        http://192.168.1.50:8080
+```
+
+**2. Entrar al chat:** cada compañero abre en su navegador la dirección que sale (`http://192.168.1.50:8080`), escribe su nombre y listo. No hace falta instalar nada.
+
+> En Windows usa `python` en lugar de `python3`.
 
 ## ⚙️ Cómo funciona
 
 ```
- Cliente (Ana)  ──┐
-                  │      TCP, puerto 5555
- Cliente (Bea)  ──┼──────────────────────►  Servidor (192.168.1.50)
-                  │                            │
- Cliente (Luis) ──┘                            └─► reenvía cada mensaje a los demás
+ Navegador (Ana) ──┐
+                   │      HTTP, puerto 8080
+ Navegador (Bea) ──┼──────────────────────►  servidor_web.py
+                   │                          ├─ guarda los mensajes en memoria
+ Móvil (Luis)    ──┘                          └─ guarda los archivos en archivos/
 ```
 
-1. El **servidor** abre el puerto `5555` y se queda esperando conexiones.
-2. Cada **cliente** se conecta a la IP del servidor y lo primero que envía es su nombre.
-3. Cuando alguien manda un mensaje o un archivo, el servidor lo **reenvía a todos los demás**.
-4. Se usan **hilos** (`threading`): el servidor atiende a cada usuario en un hilo distinto y el cliente escucha mientras tú escribes.
+### Mensajes
 
-### El "protocolo" del chat
+El servidor guarda los mensajes en una lista, y cada uno lleva un número (`id`). Cada navegador pregunta **cada segundo**: *"¿hay mensajes nuevos desde el número X?"* (`GET /mensajes?desde=X`). Esta técnica se llama **polling**.
 
-Cada mensaje viaja como **una línea de texto en formato JSON** terminada en `\n`. El `\n` sirve para saber dónde acaba un mensaje, porque TCP puede juntar o partir los datos.
+### Archivos por trozos
 
-```json
-{"tipo": "nombre",   "nombre": "Ana"}
-{"tipo": "texto",    "texto": "hola!"}
-{"tipo": "archivo",  "nombre": "apuntes.pdf", "datos": "JVBERi0xLjQK..."}
-{"tipo": "usuarios"}
-```
-
-Los archivos se convierten a **base64** (texto) para poder meterlos dentro del JSON.
-
-### Conceptos de redes que se practican
-
-- **Socket TCP** (`socket.SOCK_STREAM`) y las funciones `bind`, `listen`, `accept` y `connect`.
-- **IP y puerto**: el servidor escucha en `0.0.0.0:5555`.
-- **Protocolo de aplicación** propio con mensajes JSON delimitados por `\n`.
-- **Codificación**: UTF-8 para el texto y base64 para los archivos.
-- **VPN** (Tailscale) para conectar equipos de redes distintas.
-
-## 📋 Requisitos
-
-- Python 3 (no hace falta instalar librerías).
-- Para el cliente con ventana en Ubuntu: `sudo apt install python3-tk`.
-
-## 🚀 Uso en la misma red
-
-**1. Arrancar el servidor**
-
-```bash
-python3 servidor.py
-```
+Mandar un archivo grande de golpe gastaría mucha memoria y bloquearía el chat, así que el navegador lo parte en **trozos de 1 MB**:
 
 ```
-===== CHAT DE CLASE (v2) =====
-Servidor encendido. Decid a vuestros compañeros que se conecten a: 192.168.1.50
+Navegador                                   Servidor
+ │ POST /subir/inicio  {nombre, tamaño} ───► │ crea un archivo vacío y devuelve un id
+ │ POST /subir/trozo?id=...  (1 MB)     ───► │ lo añade al final del archivo
+ │ POST /subir/trozo?id=...  (1 MB)     ───► │ lo añade al final del archivo
+ │   ...                                     │
+ │ POST /subir/fin?id=...               ───► │ comprueba que está completo y lo anuncia
 ```
 
-**2. Conectarse** (cada compañero)
+- En el navegador, `archivo.slice()` corta el trozo sin cargar el archivo entero.
+- El servidor escribe cada trozo en disco, así que la memoria apenas se nota aunque el archivo pese 1 GB.
+- La barra de progreso está hecha de **cuadritos**, y cada uno representa un grupo de trozos.
+- Los demás descargan el archivo con `GET /descargar/<id>`, y el servidor lo envía de 64 KB en 64 KB.
 
-```bash
-python3 cliente_gui.py
-```
+### Seguridad básica
 
-Pide la IP del servidor y tu nombre, y abre el chat.
+- Los mensajes se muestran con `textContent`, así que nadie puede colar código HTML o JavaScript.
+- Los nombres de archivo se limpian con `os.path.basename` para evitar rutas como `../../`.
+- El servidor comprueba los tamaños: máximo 2 GB por archivo y 4 MB por trozo.
 
-O en la terminal:
+## 🌍 Usarlo desde fuera de clase (Tailscale)
 
-```bash
-python3 cliente.py
-```
+[Tailscale](https://tailscale.com) crea una **red privada virtual (VPN)** entre vuestros equipos por internet, y además el tráfico va cifrado.
 
-| Comando           | Qué hace                         |
-|-------------------|----------------------------------|
-| `/archivo ruta`   | Envía un archivo                 |
-| `/usuarios`       | Muestra quién está conectado     |
-| `/salir`          | Sale del chat                    |
-
-> 💡 Para probarlo en un solo PC, abre varios clientes y usa la IP `127.0.0.1`.
-> En Windows usa `python` en lugar de `python3`.
-
-## 🌍 Uso desde fuera (con Tailscale)
-
-[Tailscale](https://tailscale.com) crea una **red privada virtual (VPN)** entre vuestros equipos por internet, así que el chat funciona igual que en clase, estéis donde estéis. Además, el tráfico va cifrado.
-
-1. Instalar Tailscale en cada PC (en Linux):
-   ```bash
-   curl -fsSL https://tailscale.com/install.sh | sh
-   sudo tailscale up
-   ```
+1. Instalar Tailscale en cada equipo (en Linux: `curl -fsSL https://tailscale.com/install.sh | sh` y después `sudo tailscale up`). En el móvil hay app.
 2. Invitar a los compañeros a tu red de Tailscale desde el panel de administración.
-3. Quien hace de servidor mira su IP de Tailscale:
-   ```bash
-   tailscale ip -4
-   ```
-   Será algo como `100.101.102.103`.
-4. Los demás se conectan con `cliente_gui.py` usando esa IP.
+3. Quien hace de servidor mira su IP con `tailscale ip -4` (algo como `100.101.102.103`).
+4. Los demás abren `http://100.101.102.103:8080`.
 
 ## 🛠️ Problemas frecuentes
 
-- **No se puede conectar**: comprueba con `ping` que llegas al servidor.
-- **El ping va pero el chat no**: el firewall puede estar bloqueando el puerto. En Ubuntu: `sudo ufw allow 5555/tcp`.
-- **Se desconectan todos de golpe**: se ha cerrado el servidor.
-- **`No module named 'tkinter'`**: `sudo apt install python3-tk`.
-
-## 🔮 Posibles mejoras
-
-- [x] Interfaz gráfica con Tkinter
-- [x] Envío de archivos
-- [ ] Guardar el historial del chat en un archivo `.txt`
-- [ ] Mensajes privados (`/msg nombre texto`)
-- [ ] Colores para cada usuario
+- **La página no carga en otro equipo**: comprueba con `ping` que llegas al servidor.
+- **El ping va pero la página no**: el firewall bloquea el puerto. En Ubuntu: `sudo ufw allow 8080/tcp`.
+- **Sale "Sin conexión con el servidor"**: se ha cerrado `servidor_web.py`.
 
 ## ⚠️ Aviso
 
-Proyecto educativo para usar entre compañeros de confianza. Sin Tailscale, los mensajes viajan sin cifrar por la red local. No abras archivos recibidos de personas que no conoces.
+Proyecto educativo para usar entre compañeros de confianza. Sin Tailscale, los mensajes viajan sin cifrar por la red local. Los mensajes se borran al apagar el servidor; los archivos subidos se quedan en la carpeta `archivos/`.
+
+## 🔮 Posibles mejoras
+
+- [ ] Guardar el historial de mensajes en un archivo
+- [ ] Mensajes privados
+- [ ] Contraseña para entrar al chat
+- [ ] Usar WebSockets en vez de polling
 
 ## 👩‍💻 Autora
 

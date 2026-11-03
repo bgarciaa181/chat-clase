@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chat de clase</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kalam:wght@700&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ----- Colores: libreta de cuadros y tinta azul ----- */
+  :root {
+    --papel: #f7f9fc;
+    --cuadricula: #dfe7f3;
+    --tinta: #1f4fb5;
+    --tinta-suave: #e6edfa;
+    --lapiz: #5a6475;
+    --texto: #1b2230;
+    --tarjeta: #ffffff;
+    --borde: #cfd9e8;
+    --error: #b42318;
+    --hecho: #1d7a4d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --papel: #141c28;
+      --cuadricula: #1e2938;
+      --tinta: #7ea6ff;
+      --tinta-suave: #22314a;
+      --lapiz: #9aa6b8;
+      --texto: #e8edf5;
+      --tarjeta: #1b2534;
+      --borde: #2d3b50;
+      --error: #ff8a80;
+      --hecho: #6fd3a0;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: "Lexend", system-ui, sans-serif;
+    font-size: 15px;
+    color: var(--texto);
+    background-color: var(--papel);
+    /* el fondo de cuadritos, como una libreta */
+    background-image:
+      linear-gradient(var(--cuadricula) 1px, transparent 1px),
+      linear-gradient(90deg, var(--cuadricula) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+  button, input { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid var(--tinta); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+
+  /* ----- Pantalla de entrada ----- */
+  .entrada {
+    min-height: 100%;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+  }
+  .entrada form {
+    width: 100%;
+    max-width: 360px;
+    background: var(--tarjeta);
+    border: 1px solid var(--borde);
+    border-radius: 14px;
+    padding: 28px 24px;
+  }
+  .titulo {
+    font-family: "Kalam", "Comic Sans MS", cursive;
+    font-size: 34px;
+    line-height: 1.1;
+    color: var(--tinta);
+    margin: 0 0 6px;
+  }
+  .entrada p { color: var(--lapiz); margin: 0 0 22px; line-height: 1.5; }
+  .entrada label { display: block; font-weight: 500; margin-bottom: 6px; }
+
+  .caja {
+    width: 100%;
+    padding: 11px 14px;
+    border: 1.5px solid var(--borde);
+    border-radius: 10px;
+    background: var(--papel);
+  }
+  .caja:focus { border-color: var(--tinta); outline: none; }
+
+  .boton {
+    border: none;
+    border-radius: 10px;
+    padding: 11px 18px;
+    background: var(--tinta);
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  @media (prefers-color-scheme: dark) { .boton { color: #0d1522; } }
+  .boton:disabled { opacity: .5; cursor: default; }
+  .entrada .boton { width: 100%; margin-top: 14px; }
+
+  /* ----- Pantalla del chat ----- */
+  .chat {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  .cabecera {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 16px;
+    background: var(--tarjeta);
+    border-bottom: 1px solid var(--borde);
+  }
+  .cabecera .titulo { font-size: 26px; margin: 0; }
+  .conectados {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    color: var(--lapiz);
+    font-size: 13px;
+  }
+  .persona {
+    background: var(--tinta-suave);
+    color: var(--texto);
+    border-radius: 999px;
+    padding: 3px 10px;
+  }
+  .persona::before {
+    content: "";
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--hecho);
+    margin-right: 6px;
+    vertical-align: 1px;
+  }
+
+  .aviso-conexion {
+    background: var(--error);
+    color: #fff;
+    text-align: center;
+    padding: 6px 16px;
+    font-size: 13px;
+  }
+
+  .mensajes {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 16px;
+  }
+  .columna { max-width: 760px; margin: 0 auto; }
+
+  .vacio {
+    text-align: center;
+    color: var(--lapiz);
+    margin-top: 18vh;
+    line-height: 1.6;
+  }
+
+  .mensaje { display: flex; flex-direction: column; align-items: flex-start; margin-top: 4px; }
+  .mensaje.mio { align-items: flex-end; }
+  .mensaje.nuevo-autor { margin-top: 16px; }
+  .autor { font-size: 13px; font-weight: 600; color: var(--tinta); margin: 0 6px 3px; }
+
+  .burbuja {
+    max-width: min(560px, 85%);
+    background: var(--tarjeta);
+    border: 1px solid var(--borde);
+    border-radius: 4px 14px 14px 14px;
+    padding: 8px 12px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .mio .burbuja {
+    background: var(--tinta);
+    border-color: var(--tinta);
+    color: #fff;
+    border-radius: 14px 4px 14px 14px;
+  }
+  @media (prefers-color-scheme: dark) { .mio .burbuja { color: #0d1522; } }
+  .hora { font-size: 11px; opacity: .65; margin-left: 8px; white-space: nowrap; }
+
+  .aviso {
+    text-align: center;
+    color: var(--lapiz);
+    font-size: 13px;
+    margin: 14px 0 6px;
+  }
+
+  /* Archivos dentro del chat */
+  .archivo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    white-space: normal;
+  }
+  .icono {
+    flex: none;
+    width: 40px; height: 40px;
+    border-radius: 8px;
+    display: grid; place-items: center;
+    font-size: 20px;
+    background: var(--tinta-suave);
+  }
+  .mio .icono { background: rgba(255,255,255,.18); }
+  .archivo-nombre { font-weight: 500; overflow-wrap: anywhere; }
+  .archivo-tamano { font-size: 12px; opacity: .75; }
+  .descargar {
+    flex: none;
+    margin-left: auto;
+    color: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    border: 1.5px solid currentColor;
+    border-radius: 8px;
+    padding: 5px 10px;
+  }
+  .foto {
+    display: block;
+    max-width: 100%;
+    max-height: 280px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+  }
+
+  /* ----- Subidas en curso: cada cuadrito es un grupo de trozos ----- */
+  .subidas { padding: 0 16px; }
+  .subida {
+    max-width: 760px;
+    margin: 0 auto 8px;
+    background: var(--tarjeta);
+    border: 1px solid var(--borde);
+    border-radius: 12px;
+    padding: 10px 14px;
+  }
+  .subida-linea {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 13px;
+    margin-bottom: 8px;
+  }
+  .subida-linea strong { font-weight: 500; overflow-wrap: anywhere; }
+  .subida-estado { color: var(--lapiz); white-space: nowrap; }
+  .trozos {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(10px, 1fr));
+    gap: 3px;
+  }
+  .trozo {
+    height: 10px;
+    border-radius: 2px;
+    background: var(--cuadricula);
+    transition: background-color .15s;
+  }
+  .trozo.lleno { background: var(--tinta); }
+  .subida.terminada .trozo.lleno { background: var(--hecho); }
+  .subida.fallida .subida-estado { color: var(--error); }
+
+  /* ----- Barra de escribir ----- */
+  .escribir {
+    padding: 10px 16px 14px;
+    background: var(--tarjeta);
+    border-top: 1px solid var(--borde);
+  }
+  .escribir form {
+    max-width: 760px;
+    margin: 0 auto;
+    display: flex;
+    gap: 8px;
+  }
+  .clip {
+    flex: none;
+    width: 44px;
+    border: 1.5px solid var(--borde);
+    border-radius: 10px;
+    background: var(--papel);
+    font-size: 18px;
+    cursor: pointer;
+  }
+  .clip:hover { border-color: var(--tinta); }
+  .escribir .caja { flex: 1; min-width: 0; }
+
+  /* Capa que aparece al arrastrar un archivo encima */
+  .soltar {
+    position: fixed;
+    inset: 12px;
+    border: 3px dashed var(--tinta);
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--papel) 88%, transparent);
+    display: grid;
+    place-items: center;
+    font-family: "Kalam", cursive;
+    font-size: 30px;
+    color: var(--tinta);
+    pointer-events: none;
+  }
+
+  @media (max-width: 560px) {
+    .cabecera { flex-wrap: wrap; gap: 6px; }
+    .conectados { margin-left: 0; justify-content: flex-start; }
+    .burbuja { max-width: 92%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .trozo { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Pantalla 1: elegir nombre -->
+<main class="entrada" id="pantallaEntrada">
+  <form id="formEntrada">
+    <h1 class="titulo">Chat de clase</h1>
+    <p>Escribe tu nombre para entrar. Podrás hablar con los demás y pasaros archivos de cualquier tamaño.</p>
+    <label for="nombre">Tu nombre</label>
+    <input class="caja" id="nombre" maxlength="20" autocomplete="off" required>
+    <button class="boton" type="submit">Entrar al chat</button>
+  </form>
+</main>
+
+<!-- Pantalla 2: el chat -->
+<div class="chat" id="pantallaChat" hidden>
+  <header class="cabecera">
+    <h1 class="titulo">Chat de clase</h1>
+    <div class="conectados" id="conectados" aria-live="polite"></div>
+  </header>
+
+  <div class="aviso-conexion" id="avisoConexion" hidden>
+    Sin conexión con el servidor. Reintentando…
+  </div>
+
+  <section class="mensajes" id="zonaMensajes" aria-live="polite">
+    <div class="columna" id="listaMensajes">
+      <p class="vacio" id="vacio">Todavía no hay mensajes.<br>Saluda o arrastra un archivo aquí para compartirlo.</p>
+    </div>
+  </section>
+
+  <div class="subidas" id="subidas"></div>
+
+  <footer class="escribir">
+    <form id="formMensaje">
+      <button class="clip" type="button" id="botonClip" title="Enviar archivo" aria-label="Enviar archivo">📎</button>
+      <input type="file" id="elegirArchivo" multiple hidden>
+      <input class="caja" id="texto" placeholder="Escribe un mensaje" autocomplete="off" maxlength="2000">
+      <button class="boton" type="submit">Enviar</button>
+    </form>
+  </footer>
+</div>
+
+<div class="soltar" id="capaSoltar" hidden>Suelta para enviar</div>
+
+<script>
+// ===== Ajustes =====
+const TAMANO_TROZO = 1024 * 1024;        // los archivos se suben en trozos de 1 MB
+const CUADRITOS_MAXIMOS = 60;            // cuántos cuadritos dibujamos como mucho por subida
+
+// ===== Estado =====
+let miNombre = "";
+let ultimoId = 0;          // número del último mensaje que hemos recibido
+let ultimoAutor = null;    // para no repetir el nombre en mensajes seguidos
+let colaSubidas = Promise.resolve();   // los archivos se suben de uno en uno
+
+const $ = (id) => document.getElementById(id);
+
+// ===== Entrar al chat =====
+try { $("nombre").value = localStorage.getItem("nombreChat") || ""; } catch (e) {}
+
+$("formEntrada").addEventListener("submit", (e) => {
+  e.preventDefault();
+  miNombre = $("nombre").value.trim().slice(0, 20);
+  if (!miNombre) return;
+  try { localStorage.setItem("nombreChat", miNombre); } catch (e) {}
+  $("pantallaEntrada").hidden = true;
+  $("pantallaChat").hidden = false;
+  $("texto").focus();
+  pedirMensajes();
+});
+
+// ===== Recibir mensajes: preguntamos al servidor cada segundo =====
+async function pedirMensajes() {
+  try {
+    const respuesta = await fetch(`/mensajes?desde=${ultimoId}&nombre=${encodeURIComponent(miNombre)}`);
+    const datos = await respuesta.json();
+    $("avisoConexion").hidden = true;
+    for (const mensaje of datos.mensajes) {
+      pintarMensaje(mensaje);
+      ultimoId = mensaje.id;
+    }
+    pintarConectados(datos.conectados);
+  } catch (error) {
+    $("avisoConexion").hidden = false;
+  }
+  setTimeout(pedirMensajes, 1000);
+}
+
+function pintarConectados(lista) {
+  const zona = $("conectados");
+  zona.textContent = "";
+  for (const persona of lista) {
+    const chip = document.createElement("span");
+    chip.className = "persona";
+    chip.textContent = persona === miNombre ? `${persona} (tú)` : persona;
+    zona.appendChild(chip);
+  }
+}
+
+function pintarMensaje(mensaje) {
+  const zona = $("zonaMensajes");
+  const abajoDelTodo = zona.scrollHeight - zona.scrollTop - zona.clientHeight < 80;
+  $("vacio").hidden = true;
+
+  if (mensaje.tipo === "aviso") {
+    const p = document.createElement("p");
+    p.className = "aviso";
+    p.textContent = mensaje.texto;
+    $("listaMensajes").appendChild(p);
+    ultimoAutor = null;
+  } else {
+    const esMio = mensaje.de === miNombre;
+    const caja = document.createElement("div");
+    caja.className = "mensaje" + (esMio ? " mio" : "");
+
+    // El nombre solo aparece si cambia la persona que escribe
+    if (mensaje.de !== ultimoAutor) {
+      caja.classList.add("nuevo-autor");
+      if (!esMio) {
+        const autor = document.createElement("span");
+        autor.className = "autor";
+        autor.textContent = mensaje.de;
+        caja.appendChild(autor);
+      }
+    }
+    ultimoAutor = mensaje.de;
+
+    const burbuja = document.createElement("div");
+    burbuja.className = "burbuja";
+    if (mensaje.tipo === "texto") {
+      burbuja.textContent = mensaje.texto;   // textContent: nadie puede colar código HTML
+    } else if (mensaje.tipo === "archivo") {
+      pintarArchivo(burbuja, mensaje.archivo);
+    }
+    const hora = document.createElement("span");
+    hora.className = "hora";
+    hora.textContent = mensaje.hora;
+    burbuja.appendChild(hora);
+
+    caja.appendChild(burbuja);
+    $("listaMensajes").appendChild(caja);
+  }
+
+  if (abajoDelTodo) zona.scrollTop = zona.scrollHeight;
+}
+
+function pintarArchivo(burbuja, archivo) {
+  const extension = archivo.nombre.split(".").pop().toLowerCase();
+
+  // Si es una foto, la enseñamos en pequeño
+  if (["png", "jpg", "jpeg", "gif", "webp"].includes(extension)) {
+    const foto = document.createElement("img");
+    foto.className = "foto";
+    foto.src = `/ver/${archivo.id}`;
+    foto.alt = archivo.nombre;
+    foto.loading = "lazy";
+    foto.onload = () => {
+      const zona = $("zonaMensajes");
+      if (zona.scrollHeight - zona.scrollTop - zona.clientHeight < 400) zona.scrollTop = zona.scrollHeight;
+    };
+    burbuja.appendChild(foto);
+  }
+
+  const fila = document.createElement("div");
+  fila.className = "archivo";
+
+  const icono = document.createElement("span");
+  icono.className = "icono";
+  icono.textContent = iconoPara(extension);
+
+  const info = document.createElement("div");
+  const nombre = document.createElement("div");
+  nombre.className = "archivo-nombre";
+  nombre.textContent = archivo.nombre;
+  const tamano = document.createElement("div");
+  tamano.className = "archivo-tamano";
+  tamano.textContent = tamanoBonito(archivo.tamano);
+  info.append(nombre, tamano);
+
+  const enlace = document.createElement("a");
+  enlace.className = "descargar";
+  enlace.href = `/descargar/${archivo.id}`;
+  enlace.textContent = "Descargar";
+
+  fila.append(icono, info, enlace);
+  burbuja.appendChild(fila);
+}
+
+function iconoPara(extension) {
+  if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(extension)) return "🖼️";
+  if (["mp4", "mkv", "avi", "mov", "webm"].includes(extension)) return "🎬";
+  if (["mp3", "wav", "ogg", "m4a"].includes(extension)) return "🎵";
+  if (["zip", "rar", "7z", "tar", "gz"].includes(extension)) return "🗜️";
+  if (extension === "pdf") return "📕";
+  if (["doc", "docx", "odt", "txt", "md"].includes(extension)) return "📝";
+  if (["py", "php", "js", "html", "css", "sh", "c", "java"].includes(extension)) return "💻";
+  return "📄";
+}
+
+function tamanoBonito(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(0)} KB`;
+  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+  return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
+}
+
+// ===== Enviar mensajes de texto =====
+$("formMensaje").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const texto = $("texto").value.trim();
+  if (!texto) return;
+  $("texto").value = "";
+  try {
+    await fetch("/enviar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nombre: miNombre, texto: texto }),
+    });
+  } catch (error) {
+    $("texto").value = texto;   // si falla, devolvemos el texto para no perderlo
+    $("avisoConexion").hidden = false;
+  }
+});
+
+// ===== Enviar archivos por trozos =====
+$("botonClip").addEventListener("click", () => $("elegirArchivo").click());
+$("elegirArchivo").addEventListener("change", (e) => {
+  for (const archivo of e.target.files) ponerEnCola(archivo);
+  e.target.value = "";
+});
+
+function ponerEnCola(archivo) {
+  const tarjeta = crearTarjetaSubida(archivo);
+  colaSubidas = colaSubidas.then(() => subirArchivo(archivo, tarjeta));
+}
+
+function crearTarjetaSubida(archivo) {
+  const totalTrozos = Math.max(1, Math.ceil(archivo.size / TAMANO_TROZO));
+  const cuadritos = Math.min(totalTrozos, CUADRITOS_MAXIMOS);
+
+  const tarjeta = document.createElement("div");
+  tarjeta.className = "subida";
+
+  const linea = document.createElement("div");
+  linea.className = "subida-linea";
+  const nombre = document.createElement("strong");
+  nombre.textContent = `${archivo.name} · ${tamanoBonito(archivo.size)}`;
+  const estado = document.createElement("span");
+  estado.className = "subida-estado";
+  estado.textContent = "En espera";
+  linea.append(nombre, estado);
+
+  const rejilla = document.createElement("div");
+  rejilla.className = "trozos";
+  rejilla.setAttribute("aria-hidden", "true");
+  for (let i = 0; i < cuadritos; i++) {
+    const c = document.createElement("span");
+    c.className = "trozo";
+    rejilla.appendChild(c);
+  }
+
+  tarjeta.append(linea, rejilla);
+  $("subidas").appendChild(tarjeta);
+  $("zonaMensajes").scrollTop = $("zonaMensajes").scrollHeight;   // que no tape el último mensaje
+  return { tarjeta, estado, celdas: rejilla.children, totalTrozos };
+}
+
+function marcarProgreso(subida, trozosEnviados) {
+  const proporcion = trozosEnviados / subida.totalTrozos;
+  const llenos = Math.round(proporcion * subida.celdas.length);
+  for (let i = 0; i < subida.celdas.length; i++) {
+    subida.celdas[i].classList.toggle("lleno", i < llenos);
+  }
+  subida.estado.textContent =
+    `Trozo ${trozosEnviados} de ${subida.totalTrozos} · ${Math.round(proporcion * 100)} %`;
+}
+
+async function subirArchivo(archivo, subida) {
+  try {
+    // Paso 1: avisamos al servidor de que va un archivo
+    const inicio = await fetch("/subir/inicio", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nombre: miNombre, archivo: archivo.name, tamano: archivo.size }),
+    }).then((r) => r.json());
+    if (inicio.error) throw new Error(inicio.error);
+
+    // Paso 2: mandamos el archivo trozo a trozo
+    marcarProgreso(subida, 0);
+    for (let n = 0; n < subida.totalTrozos; n++) {
+      const trozo = archivo.slice(n * TAMANO_TROZO, (n + 1) * TAMANO_TROZO);
+      const respuesta = await fetch(`/subir/trozo?id=${inicio.id}`, { method: "POST", body: trozo });
+      if (!respuesta.ok) throw new Error("El servidor ha rechazado un trozo");
+      marcarProgreso(subida, n + 1);
+    }
+
+    // Paso 3: avisamos de que hemos terminado
+    const fin = await fetch(`/subir/fin?id=${inicio.id}`, { method: "POST" }).then((r) => r.json());
+    if (fin.error) throw new Error(fin.error);
+
+    subida.tarjeta.classList.add("terminada");
+    subida.estado.textContent = "Enviado";
+    setTimeout(() => subida.tarjeta.remove(), 2500);
+  } catch (error) {
+    subida.tarjeta.classList.add("fallida");
+    subida.estado.textContent = `No se ha podido enviar: ${error.message}`;
+    setTimeout(() => subida.tarjeta.remove(), 8000);
+  }
+}
+
+// ===== Arrastrar y soltar archivos =====
+let arrastres = 0;
+window.addEventListener("dragenter", (e) => {
+  if ($("pantallaChat").hidden || !e.dataTransfer.types.includes("Files")) return;
+  arrastres++;
+  $("capaSoltar").hidden = false;
+});
+window.addEventListener("dragleave", () => {
+  arrastres = Math.max(0, arrastres - 1);
+  if (arrastres === 0) $("capaSoltar").hidden = true;
+});
+window.addEventListener("dragover", (e) => e.preventDefault());
+window.addEventListener("drop", (e) => {
+  e.preventDefault();
+  arrastres = 0;
+  $("capaSoltar").hidden = true;
+  if ($("pantallaChat").hidden) return;
+  for (const archivo of e.dataTransfer.files) ponerEnCola(archivo);
+});
+</script>
+</body>
+</html>
