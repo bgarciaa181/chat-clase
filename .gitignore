@@ -1,0 +1,6 @@
+# Archivos que genera Python y no hace falta subir
+__pycache__/
+*.pyc
+
+# Configuración de VS Code
+.vscode/
